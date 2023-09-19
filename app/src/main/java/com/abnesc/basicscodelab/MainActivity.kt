@@ -4,9 +4,6 @@ import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,8 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,9 +21,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.abnesc.basicscodelab.ui.theme.BasicsCodelabTheme
 
 class MainActivity : ComponentActivity() {
@@ -48,7 +46,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MyApp(modifier: Modifier = Modifier) {
+fun MyApp(
+    modifier: Modifier = Modifier,
+    mainViewModel: MainViewModel = viewModel()
+) {
+    val uiState by mainViewModel.uiState.collectAsState()
 
     var shouldShowOnboarding by rememberSaveable { mutableStateOf(true) }
 
@@ -56,7 +58,9 @@ fun MyApp(modifier: Modifier = Modifier) {
         if (shouldShowOnboarding) {
             OnboardingScreen(onContinueClicked = { shouldShowOnboarding = false })
         } else {
-            Greetings()
+            Greetings(items = uiState.items) { item ->
+                mainViewModel.onFavoriteItem(item)
+            }
         }
     }
 }
@@ -86,11 +90,55 @@ fun OnboardingScreen(
 @Composable
 private fun Greetings(
     modifier: Modifier = Modifier,
-    names: List<String> = List(1000) { "$it" }
+    items: List<MainItem> = emptyList(),
+    onFavorite: (item: MainItem) -> Unit = {}
 ) {
     LazyColumn(modifier = modifier.padding(vertical = 4.dp)) {
-        items(items = names) { name ->
-            Greeting(name = name)
+        this.items(items = items) { item ->
+            Greeting(
+                name = item.name,
+                selected = item.selected,
+                onFavorite = {
+                    onFavorite(item)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun Greeting(
+    name: String,
+    selected: Boolean,
+    onFavorite: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)
+    ) {
+        Row(modifier = Modifier.padding(24.dp)) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "Hello, ")
+                Text(
+                    text = name, style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                )
+            }
+            Column {
+                IconButton(onClick = onFavorite) {
+                    Icon(
+                        imageVector = if (selected) {
+                            Icons.Filled.Favorite
+                        } else {
+                            Icons.Filled.FavoriteBorder
+                        },
+                        contentDescription = null,
+                    )
+                }
+            }
         }
     }
 }
@@ -100,54 +148,6 @@ private fun Greetings(
 fun OnboardingPreview() {
     BasicsCodelabTheme {
         OnboardingScreen(onContinueClicked = {})
-    }
-}
-
-@Composable
-private fun Greeting(name: String) {
-
-    var expanded by remember { mutableStateOf(false) }
-
-    val extraPadding by animateDpAsState(
-        if (expanded) 48.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "",
-    )
-    Surface(
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)
-    ) {
-        Row(modifier = Modifier.padding(24.dp)) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(bottom = extraPadding.coerceAtLeast(0.dp))
-            ) {
-                Text(text = "Hello, ")
-                Text(text = name, style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.ExtraBold
-                ))
-                if (expanded) {
-                    Text(
-                        text = ("Composem ipsum color sit lazy, " +
-                                "padding theme elit, sed do bouncy. ").repeat(4),
-                    )
-                }
-            }
-            IconButton(onClick = { expanded = !expanded }) {
-                Icon(
-                    imageVector = if (expanded) {
-                        Icons.Filled.ExpandLess
-                    } else {
-                        Icons.Filled.ExpandMore
-                    },
-                    contentDescription = null,
-                )
-            }
-        }
     }
 }
 
@@ -161,7 +161,9 @@ private fun Greeting(name: String) {
 @Composable
 fun DefaultPreview() {
     BasicsCodelabTheme {
-        Greetings()
+        Greetings(
+            items = listOf(MainItem(name = "Android", selected = true)),
+        )
     }
 }
 
